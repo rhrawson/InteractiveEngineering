@@ -1,0 +1,40 @@
+#sliders-container {
+    padding-left: 15px;
+    padding-top: 15px;
+    max-width: 600px;
+    border: 2px solid black;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+}
+
+.slider-label {
+    flex: 0.2;
+    max-width: 20%;
+    border: 2px solid red;
+}
+
+.slider-container {
+    flex: 1;
+    border: 2px solid blue;
+}
+
+.plotLine {
+    fill: none;
+    stroke-width: 3px;
+    cursor: pointer;
+}
+
+.plotLine:hover {
+    stroke-width: 4px;
+}
+
+#SLline {
+    stroke: green;
+}
+
+#Hpline {
+    stroke: blue;
+}
