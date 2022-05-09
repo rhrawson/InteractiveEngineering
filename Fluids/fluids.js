@@ -5,18 +5,53 @@
 // Slider bar examples
 // https://bl.ocks.org/johnwalley/e1d256b81e51da68f7feb632a53c3518
 
-// Constants (some that the user will be able to set someday)
-let z2 = 0, // [ft]
-    z1 = 20, // [ft]
-    A2 = 0.25, // [ft^2]
-    A1 = 40, // [ft^2]
-    g = 32, // [ft/sec^2]
+/* Future ideas
+    -Set a fixed width for label/slide bar divs
+    -Create remaining sliders
+    -Determine a set domain for the yScale function so that the slide bars don't change the graph dimensions
+    -Find the operating point values of Hp and Vdot.
+    -Mark/highlight the operating point on the graph
+    -Display the operating point values of Hp and Vdot
+    -Add gridlines
+    -Show Bernoulli's Equation with symbols
+    -Show Bernoulli's Equation with the current values of all parameters
+    -Show the simplified SL equation
+    -Show the system that Bernoulli's is being applied to
+
+    -Add option to change pump speed
+    -Add option to add a pump in series or parallel
+    -Show pump efficiency line?
+    -Show hydraullic and brake horsepower lines?
+*/
+
+// define extrema for each slider parameter
+let z1Max = 100, // [ft]
+    z1Min = -100, // [ft]
+    A1Max = 50, // [ft^2]
+    A1Min = 0.001, // [ft^2]
+    P1Max = 150, // [psia]
+    P1Min = 0, // [psia]
+    nuMax = 0.0338 // [ft^3/lbm]
+    nuMin = 0.0160 // [ft^3/lbm]
+    ksysMax = 20, // [lbf-sec^2/lbm-ft^5]
+    ksysMin = 0.01 // [lbf-sec^2/lbm-ft^5]
+
+
+// define default parameters for Bernoulli's Equation
+// (some that the user will be able to set with sliders)
+let g = 32, // [ft/sec^2]
     gc = 32, // [ft-lbm/lbf-sec^2]
+    z2 = 0, // [ft]
+    z1 = d3.mean([z1Max,z1Min]), // [ft]
+    A2 = 0.25, // [ft^2]
+    A1 = d3.mean([A1Max,A1Min]), // [ft^2]
     P2 = 30, // [psia]
-    P1 = 100, // [psia]
+    P1 = d3.mean([P1Max,P1Min]), // [psia]
     nu = 0.017, // [ft^3/lbm]
     ksys = 4; // [lbf-sec^2/lbm-ft^5]
 
+// Update labels with initial values
+d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
 
 /**
  * Creates an array of volume flow rates.
@@ -62,7 +97,7 @@ function calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys,g=32,gc=32) {
  */
 function calcHps(Vdots,HpMax,VdotMax) {
     return Vdots.map(Vdot => {
-        //return HpMax - 25/9*Vdot**2;
+        // Ellipse equation:
         return HpMax*(1 - Vdot**2/VdotMax**2)**(1/2);
     });
 };
@@ -87,21 +122,14 @@ function calcHps(Vdots,HpMax,VdotMax) {
                     d3.max([d3.max(Hps),d3.max(SLs)])])
 };
 
-// create arrays
-let n = 100, // number of values in each array
-    VdotMin = 0, // [ft^3/sec]
-    VdotMax = 12; // [ft^3/sec]
-    HpMax = 400; // [ft-lbf/lbm]
-    VdotMax = VdotMax; // [ft^3/sec]
-
-let Vdots = calcVdots(n,VdotMin,VdotMax);
-let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
-    Hps = calcHps(Vdots,HpMax,VdotMax);
-
-
-
-
-function combineLineData(Vdots,SLs,Hps) {
+/**
+ * 
+ * @param {*} Vdots 
+ * @param {*} SLs 
+ * @param {*} Hps 
+ * @returns 
+ */
+ function combineLineData(Vdots,SLs,Hps) {
     let _lineData = [];
     for (i=0; i<n; i++) {
         _lineData.push({
@@ -112,6 +140,21 @@ function combineLineData(Vdots,SLs,Hps) {
     };
     return _lineData;
 };
+
+// function for finding operating point values
+
+
+
+
+// create arrays
+let n = 100, // number of values in each array
+    VdotMin = 0, // [ft^3/sec]
+    VdotMax = 12; // [ft^3/sec]
+    HpMax = 400; // [ft-lbf/lbm]
+    VdotMax = VdotMax; // [ft^3/sec]
+let Vdots = calcVdots(n,VdotMin,VdotMax);
+let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+    Hps = calcHps(Vdots,HpMax,VdotMax);
 
 // Combine data in objects
 let lineData = combineLineData(Vdots,SLs,Hps);
@@ -129,19 +172,20 @@ let width = 500 - margin.left - margin.right,
 
 // create sliders    
 let sliderP1 = d3.sliderBottom()
-    .min(P1)
-    .max(150)
+    .min(P1Min)
+    .max(P1Max)
     .width(300)
     //.tickFormat()
     .default(P1)
-    //.on('onchange', val=> {d3.select('#sliderP1').text(d3.format()(val))});
     .on('onchange', val=> {
-        // Update P1
+        // update P1
         P1 = val;
-        // recalculate
+        // update P1 label
+        d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
+        // recalculate SL
         SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
         lineData = combineLineData(Vdots,SLs,Hps);
-        // Clear Plot
+        // clear Plot
         d3.select("#linesG")
             .selectAll("path").remove();
         d3.select("#x-axis").remove();
