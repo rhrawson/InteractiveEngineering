@@ -67,6 +67,26 @@ function calcHps(Vdots,HpMax,VdotMax) {
     });
 };
 
+/**
+ * 
+ * @param {function} xScale 
+ * @param {array of floats} Vdots [ft^3/sec]
+ */
+ function updateXScaleDomain(xScale,Vdots) {
+    xScale.domain([d3.min(Vdots),d3.max(Vdots)])
+};
+
+/**
+ * 
+ * @param {function} yScale 
+ * @param {array of floats} Hps [ft-lbf/lbm]
+ * @param {array of floats} SLs [ft-lbf/lbm]
+ */
+ function updateYScaleDomain(yScale,Hps,SLs) {
+    yScale.domain([d3.min([d3.min(Hps),d3.min(SLs)]),
+                    d3.max([d3.max(Hps),d3.max(SLs)])])
+};
+
 // create arrays
 let n = 100, // number of values in each array
     VdotMin = 0, // [ft^3/sec]
@@ -78,16 +98,23 @@ let Vdots = calcVdots(n,VdotMin,VdotMax);
 let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
     Hps = calcHps(Vdots,HpMax,VdotMax);
 
-// Combine data in objects
-lineData = [];
-for (i=0; i<n; i++) {
-    lineData.push({
-        Vdot: Vdots[i],
-        SL: SLs[i],
-        Hp: Hps[i]
-    });
+
+
+
+function combineLineData(Vdots,SLs,Hps) {
+    let _lineData = [];
+    for (i=0; i<n; i++) {
+        _lineData.push({
+            Vdot: Vdots[i],
+            SL: SLs[i],
+            Hp: Hps[i]
+        });
+    };
+    return _lineData;
 };
 
+// Combine data in objects
+let lineData = combineLineData(Vdots,SLs,Hps);
 
 // define margin and dimensions for svg
 let margin = {
@@ -109,7 +136,49 @@ let sliderP1 = d3.sliderBottom()
     .default(P1)
     //.on('onchange', val=> {d3.select('#sliderP1').text(d3.format()(val))});
     .on('onchange', val=> {
+        // Update P1
         P1 = val;
+        // recalculate
+        SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        lineData = combineLineData(Vdots,SLs,Hps);
+        // Clear Plot
+        d3.select("#linesG")
+            .selectAll("path").remove();
+        d3.select("#x-axis").remove();
+        d3.select("#y-axis").remove();
+        // update y scale
+        updateYScaleDomain(yScale,Hps,SLs);
+        // update y axis
+        yAxis.scale(yScale);
+        // Plot updated lines
+        linesG.append("path")
+            .datum(lineData)
+            .attr("class", "plotLine")
+            .attr("id", "Hpline")
+            .attr("d",lineGenHp)
+        linesG.append("path")
+            .datum(lineData)
+            .attr("class", "plotLine")
+            .attr("id", "SLline")
+            .attr("d",lineGenSL)
+
+        // update axes
+        // add the x-axis
+        svg.append("g")
+        .attr("id","x-axis")
+        .attr("transform",`translate(0,${yScale(0)})`)
+        .call(xAxis);
+
+        // remove the first label on the x-axis
+        svg.selectAll(".tick")
+        .filter(d => d === 0)
+        .remove();
+
+        // add the y-axis
+        svg.append("g")
+        .attr("id","y-axis")
+        .attr("transform",`translate(${xScale(0)},0)`)
+        .call(yAxis);
     });
 
 let gSliderP1 = d3.select('div#slider-P1')
@@ -136,12 +205,13 @@ let svg = d3.select("body").append("svg")
 
 // create scales for x & y axes
 let xScale = d3.scaleLinear()
-    .domain([d3.min(Vdots),d3.max(Vdots)])
     .range([margin.left,width-margin.right]);
 
 let yScale = d3.scaleLinear()
-    .domain([d3.min([d3.min(Hps),d3.min(SLs)]),d3.max([d3.max(Hps),d3.max(SLs)])])
     .range([height-margin.bottom,margin.top])
+
+updateXScaleDomain(xScale,Vdots);
+updateYScaleDomain(yScale,Hps,SLs);
 
 // create axes
 let xAxis = d3.axisBottom().scale(xScale);
@@ -156,6 +226,7 @@ let lineGenHp = d3.line()
     .y(d => yScale(d.Hp));
 
 let linesG = svg.append("g")
+    .attr("id","linesG");
 
 linesG.append("path")
     .datum(lineData)
@@ -185,5 +256,3 @@ svg.append("g")
     .attr("id","y-axis")
     .attr("transform",`translate(${xScale(0)},0)`)
     .call(yAxis);
-
-
