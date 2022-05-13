@@ -1,5 +1,5 @@
 #sliders-container {
-    padding-left: 15px;
+    padding-left: 0px;
     padding-top: 15px;
     max-width: 600px;
     border: 2px solid black;
@@ -8,16 +8,17 @@
 .row {
     display: flex;
     align-items: center;
+    border: 2px solid green;
 }
 
 .slider-label {
-    flex: 0.2;
-    max-width: 20%;
+    flex: 1;
+    max-width: 25%;
     border: 2px solid red;
 }
 
 .slider-container {
-    flex: 1;
+    flex: 3;
     border: 2px solid blue;
 }
 

@@ -27,8 +27,8 @@
 // define extrema for each slider parameter
 let z1Max = 100, // [ft]
     z1Min = -100, // [ft]
-    A1Max = 50, // [ft^2]
-    A1Min = 0.001, // [ft^2]
+    A1Max = 1, // [ft^2]
+    A1Min = 0.05, // [ft^2]
     P1Max = 150, // [psia]
     P1Min = 0, // [psia]
     nuMax = 0.0338 // [ft^3/lbm]
@@ -52,6 +52,7 @@ let g = 32, // [ft/sec^2]
 
 // Update labels with initial values
 d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
+d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
 
 /**
  * Creates an array of volume flow rates.
@@ -141,8 +142,116 @@ function calcHps(Vdots,HpMax,VdotMax) {
     return _lineData;
 };
 
-// function for finding operating point values
+// Line plot functions
+let lineGenSL = d3.line()
+    .x(d => xScale(d.Vdot))
+    .y(d => yScale(d.SL));
 
+let lineGenHp = d3.line()
+    .x(d => xScale(d.Vdot))
+    .y(d => yScale(d.Hp));
+
+/**
+ * Clears the plot
+ */
+function clearPlot() {
+    d3.select("#linesG")
+        .selectAll("path").remove();
+    d3.select("#x-axis").remove();
+    d3.select("#y-axis").remove();
+};
+
+/**
+ * Updates the plot with new SLs and Hps
+ * @param {*} Vdots 
+ * @param {*} SLs 
+ * @param {*} Hps 
+ */
+function updatePlot(Vdots,SLs,Hps) {
+    lineData = combineLineData(Vdots,SLs,Hps);
+    // update y scale
+    updateYScaleDomain(yScale,Hps,SLs);
+    // update y axis
+    yAxis.scale(yScale);
+    // Plot updated lines
+    linesG.append("path")
+        .datum(lineData)
+        .attr("class", "plotLine")
+        .attr("id", "Hpline")
+        .attr("d",lineGenHp)
+    linesG.append("path")
+        .datum(lineData)
+        .attr("class", "plotLine")
+        .attr("id", "SLline")
+        .attr("d",lineGenSL)
+
+    // update axes
+    // add the x-axis
+    svg.append("g")
+    .attr("id","x-axis")
+    .attr("transform",`translate(0,${yScale(0)})`)
+    .call(xAxis);
+
+    // remove the first label on the x-axis
+    svg.selectAll(".tick")
+    .filter(d => d === 0)
+    .remove();
+
+    // add the y-axis
+    svg.append("g")
+    .attr("id","y-axis")
+    .attr("transform",`translate(${xScale(0)},0)`)
+    .call(yAxis);
+};
+
+/**
+ * Linear interpolator function
+ * @param {float array} xArray 
+ * @param {float array} yArray 
+ * @returns interpolator(x) = interpolated y value
+ */
+ function interp1d(xArray,yArray) {
+    return function(x) {
+        return d3.piecewise(yArray)(
+        (x - xArray[0]) / (xArray[xArray.length-1] - xArray[0])
+        );
+    };
+};
+
+// function for finding operating point values
+// // Optimization approach
+// function findOP(Vdots,Hps) {
+//     let SLfromVdot = interp1d(Vdots,SLs),
+//         HpfromVdot = interp1d(Vdots,Hps),
+//         HpMinusSL = [];
+//     for (let i = 0; i < Vdots.length; i++) {
+//         HpMinusSL.push(Math.abs(Hps[i]-SLs[i]));
+//     };
+//     let minIndex = HpMinusSL.indexOf(Math.min(...HpMinusSL));
+// }
+
+// Explicit approach
+function findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs) {
+    let dpewf = (z2 - z1)*g/gc + (P2 - P1)*nu*144,
+        dkeConstantsksys = (1/A2**2 - 1/A1**2)/(2*gc) + ksys
+        //SL = dkeConstantsksys*Vdot**2 + dpewf;
+        //Hp = HpMax*(1 - Vdot**2/VdotMax**2)**(1/2);
+    let a = dkeConstantsksys**2,
+        b = 2*dkeConstantsksys*dpewf + HpMax**2/VdotMax**2,
+        c = dpewf**2 - HpMax**2;
+    let Vdot = ((-b + (b**2 - 4*a*c)**(1/2)) / (2*a))**(1/2);
+    if (!isNaN(Vdot)) {
+        let Hp = interp1d(Vdots,Hps)(Vdot),
+            SL = interp1d(Vdots,SLs)(Vdot)
+        if (Math.abs(Hp-SL) > 1e-5) {
+            return [Vdot,Hp];
+        } else {
+            console.log('Hp <> SL in findOP!',Hp,SL);
+        }    
+    } else {
+        console.log('No intersection between SL and Pump curves')
+    };
+};
 
 
 
@@ -156,6 +265,11 @@ let Vdots = calcVdots(n,VdotMin,VdotMax);
 let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
     Hps = calcHps(Vdots,HpMax,VdotMax);
 
+// display OP
+console.log('need to make the OP display');
+console.log(findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs));
+
+
 // Combine data in objects
 let lineData = combineLineData(Vdots,SLs,Hps);
 
@@ -163,7 +277,7 @@ let lineData = combineLineData(Vdots,SLs,Hps);
 let margin = {
     top: 20,
     right: 20,
-    bottom: 20,
+    bottom: 0,
     left: 40
 };
 
@@ -171,10 +285,13 @@ let width = 500 - margin.left - margin.right,
     height = 400 - margin.top - margin.bottom;
 
 // create sliders    
+let sliderWidth = 300,
+    sliderHeight = 70;
+
 let sliderP1 = d3.sliderBottom()
     .min(P1Min)
     .max(P1Max)
-    .width(300)
+    .width(sliderWidth)
     //.tickFormat()
     .default(P1)
     .on('onchange', val=> {
@@ -184,57 +301,50 @@ let sliderP1 = d3.sliderBottom()
         d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
         // recalculate SL
         SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
-        lineData = combineLineData(Vdots,SLs,Hps);
         // clear Plot
-        d3.select("#linesG")
-            .selectAll("path").remove();
-        d3.select("#x-axis").remove();
-        d3.select("#y-axis").remove();
-        // update y scale
-        updateYScaleDomain(yScale,Hps,SLs);
-        // update y axis
-        yAxis.scale(yScale);
-        // Plot updated lines
-        linesG.append("path")
-            .datum(lineData)
-            .attr("class", "plotLine")
-            .attr("id", "Hpline")
-            .attr("d",lineGenHp)
-        linesG.append("path")
-            .datum(lineData)
-            .attr("class", "plotLine")
-            .attr("id", "SLline")
-            .attr("d",lineGenSL)
-
-        // update axes
-        // add the x-axis
-        svg.append("g")
-        .attr("id","x-axis")
-        .attr("transform",`translate(0,${yScale(0)})`)
-        .call(xAxis);
-
-        // remove the first label on the x-axis
-        svg.selectAll(".tick")
-        .filter(d => d === 0)
-        .remove();
-
-        // add the y-axis
-        svg.append("g")
-        .attr("id","y-axis")
-        .attr("transform",`translate(${xScale(0)},0)`)
-        .call(yAxis);
+        clearPlot();
+        // update plot
+        updatePlot(Vdots,SLs,Hps);
     });
 
 let gSliderP1 = d3.select('div#slider-P1')
     .append('svg')
-    .attr('width', width + margin.left + margin.right)
-    .attr('height', 80)
+    .attr('width', sliderWidth + 30*2)
+    .attr('height', sliderHeight)
     .style("vertical-align", "middle")
     .append('g')
     .attr('transform', 'translate(30,30)');
 
 gSliderP1.call(sliderP1)
 
+let sliderA1 = d3.sliderBottom()
+    .min(A1Min)
+    .max(A1Max)
+    .width(sliderWidth)
+    //.tickFormat()
+    .default(A1)
+    .on('onchange', val=> {
+        // update A1
+        A1 = val;
+        // update A1 label
+        d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
+        // recalculate SL
+        SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        // clear Plot
+        clearPlot();
+        // update plot
+        updatePlot(Vdots,SLs,Hps);
+    });
+
+let gSliderA1 = d3.select('div#slider-A1')
+    .append('svg')
+    .attr('width', sliderWidth + 30*2)
+    .attr('height', sliderHeight)
+    .style("vertical-align", "middle")
+    .append('g')
+    .attr('transform', 'translate(30,30)');
+
+gSliderA1.call(sliderA1)
 
 // create svg
 let svg = d3.select("body").append("svg")
@@ -260,14 +370,6 @@ updateYScaleDomain(yScale,Hps,SLs);
 // create axes
 let xAxis = d3.axisBottom().scale(xScale);
 let yAxis = d3.axisLeft().scale(yScale);
-
-let lineGenSL = d3.line()
-    .x(d => xScale(d.Vdot))
-    .y(d => yScale(d.SL));
-
-let lineGenHp = d3.line()
-    .x(d => xScale(d.Vdot))
-    .y(d => yScale(d.Hp));
 
 let linesG = svg.append("g")
     .attr("id","linesG");
