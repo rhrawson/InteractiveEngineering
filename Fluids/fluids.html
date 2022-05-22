@@ -7,6 +7,8 @@
         <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
         <script src="https://unpkg.com/d3-simple-slider"></script>
         <script src="https://cdn.jsdelivr.net/npm/d3-interpolate@3"></script>
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
         <!--
         <script type="text/javascript" src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
         <script type="text/javascript" src="https://d3js.org/d3-legend.min.js"></script>
@@ -16,6 +18,40 @@
 
     <body>
         <h1>Fluids Demo</h1>
+        <div id="bernoullis-symbols">
+            \(
+                H_p = \Delta ke
+                    + \Delta pe
+                    + \Delta w_f
+                    + h_{L_{1-2}}
+            \)<br>
+            \(
+                H_p = \frac{|\vec{v}|^2_2 
+                    - |\vec{v}|^2_1}{2g_c}
+                    + \frac{(z_2-z_1)g}{g_c} 
+                    + \frac{P_2-P_1}{\rho} 
+                    + k_{1-2}\dot{V}^2
+            \)<br>
+            \(
+                H_p = \frac{\left(\frac{\dot{V}}{A_2}\right)^2 
+                    - \left(\frac{\dot{V}}{A_1}\right)^2}{2g_c}
+                    + \frac{(z_2-z_1)g}{g_c} 
+                    + \frac{P_2-P_1}{\rho} 
+                    + k_{1-2}\dot{V}^2
+            \)<br>
+            \(
+                H_p = \frac{(z_2-z_1)g}{g_c} 
+                    + \frac{P_2-P_1}{\rho} 
+                    + \left[
+                        \frac{1}{2g_c}
+                        \left(
+                            \frac{1}{A^2_2}
+                            - \frac{1}{A^2_1}
+                        \right)
+                        + k_{1-2}
+                    \right]\dot{V}^2
+            \)<br>
+        </div>
         <div id="sliders-container">
             <div class="row">
                 <div class="slider-label">
@@ -28,6 +64,29 @@
                     A<sub>1</sub> = <span id="A1-value"></span>
                 </div>
                 <div class="slider-container" id="slider-A1"></div>
+            </div>
+        </div>
+        <div id="numbers-display">
+            <div id="bernoullis-numbers">
+                \(
+                    H_p = \frac{(\#-\#)\#}{\#} 
+                        + \frac{\#-\#}{\#} 
+                        + \left[
+                            \frac{1}{\#}
+                            \left(
+                                \frac{1}{\#^2}
+                                - \frac{1}{\#^2}
+                            \right)
+                            + \#
+                        \right]\dot{V}^2
+                \)
+            </div>
+            <div id="simple-SL">
+                \(H_p = \# + \#\dot{V}^2\)
+            </div>
+            <div id="op-point">
+                \(H_p = \# \frac{\text{ft-lbf}}{\text{lbm}},\quad
+                \dot{V}^2 = \# \frac{\text{ft}^3}{\text{sec}}\)
             </div>
         </div>
         <script type="text/javascript" src="fluids.js"></script>

@@ -22,6 +22,12 @@
     border: 2px solid blue;
 }
 
+#op-point {
+    fill: red;
+    stroke: red;
+    cursor: pointer;
+}
+
 .plotLine {
     fill: none;
     stroke-width: 3px;

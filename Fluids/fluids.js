@@ -244,7 +244,10 @@ function findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs) {
         let Hp = interp1d(Vdots,Hps)(Vdot),
             SL = interp1d(Vdots,SLs)(Vdot)
         if (Math.abs(Hp-SL) > 1e-5) {
-            return [Vdot,Hp];
+            return {
+                "Vdot": Vdot,
+                "Hp": Hp
+            };
         } else {
             console.log('Hp <> SL in findOP!',Hp,SL);
         }    
@@ -267,7 +270,7 @@ let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
 
 // display OP
 console.log('need to make the OP display');
-console.log(findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs));
+let opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
 
 
 // Combine data in objects
@@ -385,6 +388,12 @@ linesG.append("path")
     .attr("class", "plotLine")
     .attr("id", "SLline")
     .attr("d",lineGenSL)
+
+linesG.append("circle")
+    .attr("id","op-point")
+    .attr("cx",xScale(opPoint.Vdot))
+    .attr("cy",yScale(opPoint.Hp))
+    .attr("r",7);
 
 // add the x-axis
 svg.append("g")
