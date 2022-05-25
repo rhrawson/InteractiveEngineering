@@ -28,7 +28,7 @@
 let z1Max = 100, // [ft]
     z1Min = -100, // [ft]
     A1Max = 1, // [ft^2]
-    A1Min = 0.05, // [ft^2]
+    A1Min = 0.07, // [ft^2]
     P1Max = 150, // [psia]
     P1Min = 0, // [psia]
     nuMax = 0.0338 // [ft^3/lbm]
@@ -155,8 +155,6 @@ let lineGenHp = d3.line()
  * Clears the plot
  */
 function clearPlot() {
-    d3.select("#linesG")
-        .selectAll("path").remove();
     d3.select("#x-axis").remove();
     d3.select("#y-axis").remove();
 };
@@ -173,35 +171,38 @@ function updatePlot(Vdots,SLs,Hps) {
     updateYScaleDomain(yScale,Hps,SLs);
     // update y axis
     yAxis.scale(yScale);
-    // Plot updated lines
-    linesG.append("path")
+    // update lines
+    linesG.select("#Hpline")
         .datum(lineData)
-        .attr("class", "plotLine")
-        .attr("id", "Hpline")
         .attr("d",lineGenHp)
-    linesG.append("path")
+    linesG.select("#SLline")
         .datum(lineData)
-        .attr("class", "plotLine")
-        .attr("id", "SLline")
         .attr("d",lineGenSL)
+
+    // update opPoint
+    linesG.select("#op-point")
+        .attr("cx",xScale(opPoint.Vdot))
+        .attr("cy",yScale(opPoint.Hp));
 
     // update axes
     // add the x-axis
     svg.append("g")
-    .attr("id","x-axis")
-    .attr("transform",`translate(0,${yScale(0)})`)
-    .call(xAxis);
+        .attr("id","x-axis")
+        .attr("transform",`translate(0,${yScale(0)})`)
+        .call(xAxis);
 
     // remove the first label on the x-axis
     svg.selectAll(".tick")
-    .filter(d => d === 0)
-    .remove();
+        .filter(d => d === 0)
+        .remove();
 
     // add the y-axis
     svg.append("g")
-    .attr("id","y-axis")
-    .attr("transform",`translate(${xScale(0)},0)`)
-    .call(yAxis);
+        .attr("id","y-axis")
+        .attr("transform",`translate(${xScale(0)},0)`)
+        .call(yAxis);
+
+    
 };
 
 /**
@@ -256,10 +257,24 @@ function findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs) {
     };
 };
 
+function updateNumbers(opPoint) {
+    // "bernoullis-numbers"
 
+    // "simple-SL-nums"
+    let opPointNums = `
+            \\(H_p = ${d3.format(".0f")(opPoint.Hp)} \\frac{\\text{ft-lbf}}{\\text{lbm}},\\quad
+            \\dot{V}^2 = ${d3.format(".2f")(opPoint.Vdot)} \\frac{\\text{ft}^3}{\\text{sec}}\\)
+        `
+    d3.select('#op-point-nums')
+        .html(opPointNums)
+    MathJax.typeset(["#op-point-nums"]);
+    // MathJax.Hub.Queue(["getAllJax",document.getElementById("op-point-nums")])
+    // MathJax.Hub.getAllJax(document.getElementById("op-point-nums"))
+    //MathJax.Hub.getAllJax(document.getElementById("op-point-nums"))[0].Text(opPointNums)
+};
 
 // create arrays
-let n = 100, // number of values in each array
+let n = 400, // number of values in each array
     VdotMin = 0, // [ft^3/sec]
     VdotMax = 12; // [ft^3/sec]
     HpMax = 400; // [ft-lbf/lbm]
@@ -269,9 +284,8 @@ let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
     Hps = calcHps(Vdots,HpMax,VdotMax);
 
 // display OP
-console.log('need to make the OP display');
 let opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
-
+updateNumbers(opPoint);
 
 // Combine data in objects
 let lineData = combineLineData(Vdots,SLs,Hps);
@@ -304,10 +318,14 @@ let sliderP1 = d3.sliderBottom()
         d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
         // recalculate SL
         SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        // recalculate opPoint
+        opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
         // clear Plot
         clearPlot();
         // update plot
         updatePlot(Vdots,SLs,Hps);
+        // update numbers
+        updateNumbers(opPoint);
     });
 
 let gSliderP1 = d3.select('div#slider-P1')
@@ -333,10 +351,14 @@ let sliderA1 = d3.sliderBottom()
         d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
         // recalculate SL
         SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        // recalculate opPoint
+        opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
         // clear Plot
         clearPlot();
         // update plot
         updatePlot(Vdots,SLs,Hps);
+        // update numbers
+        updateNumbers(opPoint);
     });
 
 let gSliderA1 = d3.select('div#slider-A1')
