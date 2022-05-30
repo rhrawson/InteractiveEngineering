@@ -39,20 +39,22 @@ let z1Max = 100, // [ft]
 
 // define default parameters for Bernoulli's Equation
 // (some that the user will be able to set with sliders)
-let g = 32, // [ft/sec^2]
-    gc = 32, // [ft-lbm/lbf-sec^2]
-    z2 = 0, // [ft]
-    z1 = d3.mean([z1Max,z1Min]), // [ft]
-    A2 = 0.25, // [ft^2]
-    A1 = d3.mean([A1Max,A1Min]), // [ft^2]
-    P2 = 30, // [psia]
-    P1 = d3.mean([P1Max,P1Min]), // [psia]
-    nu = 0.017, // [ft^3/lbm]
-    ksys = 4; // [lbf-sec^2/lbm-ft^5]
+let params = {
+    g: 32, // [ft/sec^2]
+    gc: 32, // [ft-lbm/lbf-sec^2]
+    z2: 0, // [ft]
+    z1: d3.mean([z1Max,z1Min]), // [ft]
+    A2: 0.25, // [ft^2]
+    A1: d3.mean([A1Max,A1Min]), // [ft^2]
+    P2: 30, // [psia]
+    P1: d3.mean([P1Max,P1Min]), // [psia]
+    nu: 0.017, // [ft^3/lbm]
+    ksys: 4 // [lbf-sec^2/lbm-ft^5]
+}
 
 // Update labels with initial values
-d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
-d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
+d3.select("#P1-value").text(`${d3.format(".1f")(params.P1)} psia`);
+d3.select("#A1-value").html(`${d3.format(".2f")(params.A1)} ft<sup>2</sup>`);
 
 /**
  * Creates an array of volume flow rates.
@@ -81,11 +83,14 @@ d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
  * @param {float or int} gc [ft-lbm/lbf-sec^2]
  * @returns [ft-lbf/lbm]
  */
-function calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys,g=32,gc=32) {
+function calcSLs(Vdots,params) {
     return Vdots.map(Vdot => {
-        let v2 = Vdot / A2;
-        let v1 = Vdot / A1;
-        return (v2**2 - v1**2)/(2*gc) + (z2 - z1)*g/gc + (P2 - P1)*nu*144 + ksys*Vdot**2;
+        let v2 = Vdot / params.A2;
+        let v1 = Vdot / params.A1;
+        return (v2**2 - v1**2)/(2*params.gc) 
+            + (params.z2 - params.z1)*params.g/params.gc 
+            + (params.P2 - params.P1)*params.nu*144 
+            + params.ksys*Vdot**2;
     });
 };
 
@@ -232,9 +237,11 @@ function updatePlot(Vdots,SLs,Hps) {
 // }
 
 // Explicit approach
-function findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs) {
-    let dpewf = (z2 - z1)*g/gc + (P2 - P1)*nu*144,
-        dkeConstantsksys = (1/A2**2 - 1/A1**2)/(2*gc) + ksys
+function findOP(params,HpMax,VdotMax,Vdots,Hps,SLs) {
+    let dpewf = (params.z2 - params.z1)*params.g/params.gc 
+                + (params.P2 - params.P1)*params.nu*144,
+        dkeConstantsksys = (1/params.A2**2 - 1/params.A1**2)/(2*params.gc) 
+            + params.ksys
         //SL = dkeConstantsksys*Vdot**2 + dpewf;
         //Hp = HpMax*(1 - Vdot**2/VdotMax**2)**(1/2);
     let a = dkeConstantsksys**2,
@@ -257,20 +264,45 @@ function findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs) {
     };
 };
 
-function updateNumbers(opPoint) {
-    // "bernoullis-numbers"
-
-    // "simple-SL-nums"
-    let opPointNums = `
+function updateNumbers(params,opPoint) {
+    // plug new numbers into equations
+    let bernoullisNums = `
+            \\(
+                H_p = \\frac{(${d3.format(".1f")(params.z2)}-${d3.format(".1f")(params.z1)})
+                        ${d3.format(".1f")(params.g)}}
+                        {${d3.format(".1f")(params.gc)}} 
+                    + \\frac{${d3.format(".1f")(params.P2)}-${d3.format(".1f")(params.P1)}}
+                        {${d3.format(".1f")(1/params.nu)}} 
+                    + \\left[
+                        \\frac{1}{${d3.format(".1f")(2*params.gc)}}
+                        \\left(
+                            \\frac{1}{${d3.format(".2f")(params.A2)}^2}
+                            - \\frac{1}{${d3.format(".2f")(params.A1)}^2}
+                        \\right)
+                        + ${d3.format(".2f")(params.ksys)}
+                    \\right]\\dot{V}^2
+            \\)
+        `,
+        simpleSLNums = `\\(
+            H_p = ${d3.format(".0f")((params.z2-params.z1)*params.g/params.gc 
+                    + (params.P2-params.P1)*params.nu*144)} 
+                + ${d3.format(".2f")(1/(2*params.gc)*(1/params.A2**2 - 1/params.A1**2) 
+                    + params.ksys)}\\dot{V}^2\\)`,
+        opPointNums = `
             \\(H_p = ${d3.format(".0f")(opPoint.Hp)} \\frac{\\text{ft-lbf}}{\\text{lbm}},\\quad
-            \\dot{V}^2 = ${d3.format(".2f")(opPoint.Vdot)} \\frac{\\text{ft}^3}{\\text{sec}}\\)
-        `
+            \\dot{V} = ${d3.format(".2f")(opPoint.Vdot)} \\frac{\\text{ft}^3}{\\text{sec}}\\)
+        `;
+    
+    // update the html for each div
+    d3.select('#bernoullis-nums')
+        .html(bernoullisNums);
+    d3.select('#simple-SL-nums')
+        .html(simpleSLNums);
     d3.select('#op-point-nums')
-        .html(opPointNums)
-    MathJax.typeset(["#op-point-nums"]);
-    // MathJax.Hub.Queue(["getAllJax",document.getElementById("op-point-nums")])
-    // MathJax.Hub.getAllJax(document.getElementById("op-point-nums"))
-    //MathJax.Hub.getAllJax(document.getElementById("op-point-nums"))[0].Text(opPointNums)
+        .html(opPointNums);
+    
+    // render the new equations
+    MathJax.typeset(["#numbers-display"]);
 };
 
 // create arrays
@@ -280,12 +312,12 @@ let n = 400, // number of values in each array
     HpMax = 400; // [ft-lbf/lbm]
     VdotMax = VdotMax; // [ft^3/sec]
 let Vdots = calcVdots(n,VdotMin,VdotMax);
-let SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+let SLs = calcSLs(Vdots,params);
     Hps = calcHps(Vdots,HpMax,VdotMax);
 
 // display OP
-let opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
-updateNumbers(opPoint);
+let opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+updateNumbers(params,opPoint);
 
 // Combine data in objects
 let lineData = combineLineData(Vdots,SLs,Hps);
@@ -310,22 +342,22 @@ let sliderP1 = d3.sliderBottom()
     .max(P1Max)
     .width(sliderWidth)
     //.tickFormat()
-    .default(P1)
+    .default(params.P1)
     .on('onchange', val=> {
         // update P1
-        P1 = val;
+        params.P1 = val;
         // update P1 label
-        d3.select("#P1-value").text(`${d3.format(".1f")(P1)} psia`);
+        d3.select("#P1-value").text(`${d3.format(".1f")(params.P1)} psia`);
         // recalculate SL
-        SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        SLs = calcSLs(Vdots,params);
         // recalculate opPoint
-        opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
+        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
         // clear Plot
         clearPlot();
         // update plot
         updatePlot(Vdots,SLs,Hps);
         // update numbers
-        updateNumbers(opPoint);
+        updateNumbers(params,opPoint);
     });
 
 let gSliderP1 = d3.select('div#slider-P1')
@@ -343,22 +375,22 @@ let sliderA1 = d3.sliderBottom()
     .max(A1Max)
     .width(sliderWidth)
     //.tickFormat()
-    .default(A1)
+    .default(params.A1)
     .on('onchange', val=> {
         // update A1
-        A1 = val;
+        params.A1 = val;
         // update A1 label
-        d3.select("#A1-value").html(`${d3.format(".2f")(A1)} ft<sup>2</sup>`);
+        d3.select("#A1-value").html(`${d3.format(".2f")(params.A1)} ft<sup>2</sup>`);
         // recalculate SL
-        SLs = calcSLs(Vdots,A2,A1,z2,z1,P2,P1,nu,ksys);
+        SLs = calcSLs(Vdots,params);
         // recalculate opPoint
-        opPoint = findOP(A2,A1,z2,z1,P2,P1,nu,ksys,HpMax,VdotMax,Vdots,Hps,SLs);
+        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
         // clear Plot
         clearPlot();
         // update plot
         updatePlot(Vdots,SLs,Hps);
         // update numbers
-        updateNumbers(opPoint);
+        updateNumbers(params,opPoint);
     });
 
 let gSliderA1 = d3.select('div#slider-A1')
