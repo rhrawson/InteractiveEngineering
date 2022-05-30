@@ -1,25 +1,27 @@
 #sliders-container {
-    padding-left: 0px;
+    padding-left: 10px;
     padding-top: 15px;
-    max-width: 600px;
-    border: 2px solid black;
+    padding-bottom: 15px;
+    max-width: 500px;
+    /* border: 2px solid black; */
 }
 
 .row {
     display: flex;
     align-items: center;
-    border: 2px solid green;
+    /* border: 2px solid green; */
 }
 
 .slider-label {
     flex: 1;
     max-width: 25%;
-    border: 2px solid red;
+    text-align: right;
+    /* border: 2px solid red; */
 }
 
 .slider-container {
     flex: 3;
-    border: 2px solid blue;
+    /* border: 2px solid blue; */
 }
 
 #op-point {

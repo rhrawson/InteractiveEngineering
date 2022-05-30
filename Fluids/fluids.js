@@ -28,14 +28,13 @@
 let z1Max = 100, // [ft]
     z1Min = -100, // [ft]
     A1Max = 1, // [ft^2]
-    A1Min = 0.07, // [ft^2]
+    A1Min = 0.1, // [ft^2]
     P1Max = 150, // [psia]
     P1Min = 0, // [psia]
     nuMax = 0.0338 // [ft^3/lbm]
     nuMin = 0.0160 // [ft^3/lbm]
     ksysMax = 20, // [lbf-sec^2/lbm-ft^5]
-    ksysMin = 0.01 // [lbf-sec^2/lbm-ft^5]
-
+    ksysMin = 4 // [lbf-sec^2/lbm-ft^5]
 
 // define default parameters for Bernoulli's Equation
 // (some that the user will be able to set with sliders)
@@ -49,12 +48,15 @@ let params = {
     P2: 30, // [psia]
     P1: d3.mean([P1Max,P1Min]), // [psia]
     nu: 0.017, // [ft^3/lbm]
-    ksys: 4 // [lbf-sec^2/lbm-ft^5]
+    ksys: d3.mean([ksysMax,ksysMin]) // [lbf-sec^2/lbm-ft^5]
 }
 
 // Update labels with initial values
 d3.select("#P1-value").text(`${d3.format(".1f")(params.P1)} psia`);
 d3.select("#A1-value").html(`${d3.format(".2f")(params.A1)} ft<sup>2</sup>`);
+d3.select("#ksys-value").text(`${d3.format(".1f")(params.ksys)} 
+            \\(\\frac{\\text{lbf-sec}^2}{\\text{lbm-ft}^5}\\)`);
+MathJax.typeset(["#ksys-value"]); // render
 
 /**
  * Creates an array of volume flow rates.
@@ -173,7 +175,7 @@ function clearPlot() {
 function updatePlot(Vdots,SLs,Hps) {
     lineData = combineLineData(Vdots,SLs,Hps);
     // update y scale
-    updateYScaleDomain(yScale,Hps,SLs);
+    // updateYScaleDomain(yScale,Hps,SLs);
     // update y axis
     yAxis.scale(yScale);
     // update lines
@@ -206,8 +208,6 @@ function updatePlot(Vdots,SLs,Hps) {
         .attr("id","y-axis")
         .attr("transform",`translate(${xScale(0)},0)`)
         .call(yAxis);
-
-    
 };
 
 /**
@@ -251,7 +251,7 @@ function findOP(params,HpMax,VdotMax,Vdots,Hps,SLs) {
     if (!isNaN(Vdot)) {
         let Hp = interp1d(Vdots,Hps)(Vdot),
             SL = interp1d(Vdots,SLs)(Vdot)
-        if (Math.abs(Hp-SL) > 1e-5) {
+        if (Math.abs(Hp-SL) < 1e-1) {
             return {
                 "Vdot": Vdot,
                 "Hp": Hp
@@ -264,6 +264,11 @@ function findOP(params,HpMax,VdotMax,Vdots,Hps,SLs) {
     };
 };
 
+/**
+ * Updates the equations with numbers
+ * @param {*} params 
+ * @param {*} opPoint 
+ */
 function updateNumbers(params,opPoint) {
     // plug new numbers into equations
     let bernoullisNums = `
@@ -403,7 +408,42 @@ let gSliderA1 = d3.select('div#slider-A1')
 
 gSliderA1.call(sliderA1)
 
-// create svg
+let sliderKsys = d3.sliderBottom()
+    .min(ksysMin)
+    .max(ksysMax)
+    .width(sliderWidth)
+    //.tickFormat()
+    .default(params.ksys)
+    .on('onchange', val=> {
+        // update ksys
+        params.ksys = val;
+        // update ksys label
+        d3.select("#ksys-value").text(`${d3.format(".1f")(params.ksys)} 
+            \\(\\frac{\\text{lbf-sec}^2}{\\text{lbm-ft}^5}\\)`);
+        MathJax.typeset(["#ksys-value"]); // render
+        // recalculate SL
+        SLs = calcSLs(Vdots,params);
+        // recalculate opPoint
+        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+        // clear Plot
+        clearPlot();
+        // update plot
+        updatePlot(Vdots,SLs,Hps);
+        // update numbers
+        updateNumbers(params,opPoint);
+    });
+
+let gSliderKsys = d3.select('div#slider-ksys')
+    .append('svg')
+    .attr('width', sliderWidth + 30*2)
+    .attr('height', sliderHeight)
+    .style("vertical-align", "middle")
+    .append('g')
+    .attr('transform', 'translate(30,30)');
+
+gSliderKsys.call(sliderKsys)
+
+// create svg for plot
 let svg = d3.select("body").append("svg")
     .attr("id", "plots_svg")
     .attr("width",width + margin.left + margin.right)
@@ -419,10 +459,11 @@ let xScale = d3.scaleLinear()
     .range([margin.left,width-margin.right]);
 
 let yScale = d3.scaleLinear()
-    .range([height-margin.bottom,margin.top])
+    .domain([-300,500])
+    .range([height-margin.bottom,margin.top]);
 
 updateXScaleDomain(xScale,Vdots);
-updateYScaleDomain(yScale,Hps,SLs);
+// updateYScaleDomain(yScale,Hps,SLs);
 
 // create axes
 let xAxis = d3.axisBottom().scale(xScale);
