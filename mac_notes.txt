@@ -2,3 +2,6 @@ Command to give user executible rights:
     chmod u+x /path/to/file.command
 
 Use .command instead of .bat to make executible file
+
+Command to make current directory the directory of the command file:
+    cd `dirname $0`
