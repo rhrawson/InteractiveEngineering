@@ -1,0 +1,4 @@
+Command to give user executible rights: 
+    chmod u+x /path/to/file.command
+
+Use .command instead of .bat to make executible file
