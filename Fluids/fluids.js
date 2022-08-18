@@ -8,14 +8,9 @@
 /* Future ideas
     -Set a fixed width for label/slide bar divs
     -Create remaining sliders
-    -Determine a set domain for the yScale function so that the slide bars don't change the graph dimensions
-    -Find the operating point values of Hp and Vdot.
-    -Mark/highlight the operating point on the graph
-    -Display the operating point values of Hp and Vdot
     -Add gridlines
     -Show the system that Bernoulli's is being applied to
 
-    -Add option to change pump speed
     -Add option to add a pump in series or parallel
     -Show pump efficiency line?
     -Show hydraullic and brake horsepower lines?
@@ -32,8 +27,8 @@ let z1Max = 100, // [ft]
     nuMin = 0.0160 // [ft^3/lbm]
     ksysMax = 20, // [lbf-sec^2/lbm-ft^5]
     ksysMin = 4, // [lbf-sec^2/lbm-ft^5]
-    pumpSpeedMax = 4, // speed multiplier, not RPM
-    pumpSpeedMin = 1/4, // speed multiplier, not RPM
+    pumpSpeedMax = 2, // speed multiplier, not RPM
+    pumpSpeedMin = 1/2, // speed multiplier, not RPM
     // define default pump curve parameters
     HpMaxDef = 400, // [ft-lbf/lbm]
     VdotMinDef = 0, // [ft^3/sec]
@@ -287,10 +282,19 @@ function findOP(Vdots,Hps,SLs,params) {
                 "Hp": Hp
             };
         } else {
-            console.log('Hp <> SL in findOP!',Hp,SL);
+            console.log('Hp <> SL in findOP!');
+            // console.log(Hp,SL);
+            return {
+                "Vdot": 0,
+                "Hp": 0
+            }
         }    
     } else {
-        console.log('No intersection between SL and Pump curves')
+        // console.log('No intersection between SL and Pump curves')
+        return {
+            "Vdot": 0,
+            "Hp": 0
+        }
     };
 };
 
@@ -478,6 +482,8 @@ let sliderPumpSpeed = d3.sliderBottom()
     .width(sliderWidth)
     //.tickFormat()
     .default(params.pumpSpeed)
+    // .step(0.5)
+    // .ticks(4)
     .on('onchange', val=> {
         // update pumpSpeed
         params.pumpSpeed = val;
@@ -520,13 +526,14 @@ let svg = d3.select("body").append("svg")
 
 // create scales for x & y axes
 let xScale = d3.scaleLinear()
+    .domain([VdotMinDef,VdotMaxDef*pumpSpeedMax])
     .range([margin.left,width-margin.right]);
 
 let yScale = d3.scaleLinear()
-    .domain([-300,500])
+    .domain([-300,HpMaxDef*pumpSpeedMax**2])
     .range([height-margin.bottom,margin.top]);
 
-updateXScaleDomain(xScale,Vdots);
+// updateXScaleDomain(xScale,Vdots);
 // updateYScaleDomain(yScale,Hps,SLs);
 
 // create axes
