@@ -13,9 +13,6 @@
     -Mark/highlight the operating point on the graph
     -Display the operating point values of Hp and Vdot
     -Add gridlines
-    -Show Bernoulli's Equation with symbols
-    -Show Bernoulli's Equation with the current values of all parameters
-    -Show the simplified SL equation
     -Show the system that Bernoulli's is being applied to
 
     -Add option to change pump speed
@@ -34,9 +31,15 @@ let z1Max = 100, // [ft]
     nuMax = 0.0338 // [ft^3/lbm]
     nuMin = 0.0160 // [ft^3/lbm]
     ksysMax = 20, // [lbf-sec^2/lbm-ft^5]
-    ksysMin = 4 // [lbf-sec^2/lbm-ft^5]
+    ksysMin = 4, // [lbf-sec^2/lbm-ft^5]
+    pumpSpeedMax = 4, // speed multiplier, not RPM
+    pumpSpeedMin = 1/4, // speed multiplier, not RPM
+    // define default pump curve parameters
+    HpMaxDef = 400, // [ft-lbf/lbm]
+    VdotMinDef = 0, // [ft^3/sec]
+    VdotMaxDef = 12 // [ft^3/sec]
 
-// define default parameters for Bernoulli's Equation
+// define default parameters for Bernoulli's Equation & Pump Curve
 // (some that the user will be able to set with sliders)
 let params = {
     g: 32, // [ft/sec^2]
@@ -48,7 +51,13 @@ let params = {
     P2: 30, // [psia]
     P1: d3.mean([P1Max,P1Min]), // [psia]
     nu: 0.017, // [ft^3/lbm]
-    ksys: d3.mean([ksysMax,ksysMin]) // [lbf-sec^2/lbm-ft^5]
+    ksys: d3.mean([ksysMax,ksysMin]), // [lbf-sec^2/lbm-ft^5]
+    HpMax: HpMaxDef, // [ft-lbf/lbm]
+    VdotMin: VdotMinDef, // [ft^3/sec]
+    VdotMax: VdotMaxDef, // [ft^3/sec]
+    pumpSpeed: 1, // speed multiplier, not RPM
+    N_par: 1, // number of identical pumps in parallel
+    N_ser: 1 // number of identical pumps in series
 }
 
 // Update labels with initial values
@@ -57,17 +66,17 @@ d3.select("#A1-value").html(`${d3.format(".2f")(params.A1)} ft<sup>2</sup>`);
 d3.select("#ksys-value").text(`${d3.format(".1f")(params.ksys)} 
             \\(\\frac{\\text{lbf-sec}^2}{\\text{lbm-ft}^5}\\)`);
 MathJax.typeset(["#ksys-value"]); // render
+d3.select("#pump-speed-value").text(`${d3.format(".2f")(params.pumpSpeed)}`);
 
 /**
  * Creates an array of volume flow rates.
  * @param {int} n number of values in each array
- * @param {float or int} VdotMin [ft^3/sec]
- * @param {float or int} VdotMax [ft^3/sec]
+ * @param {object} params
  * @returns {array of floats} [ft^3/sec]
  */
- function calcVdots(n=100,VdotMin=0,VdotMax=12) {
+ function calcVdots(n=100,params) {
     return [...Array(n).keys()].map(i => 
-        i*(VdotMax - VdotMin)/(n-1) + VdotMin);
+        i*(params.VdotMax - params.VdotMin)/(n-1) + params.VdotMin);
 };
 
 /**
@@ -99,16 +108,37 @@ function calcSLs(Vdots,params) {
 /**
  * Calculates pump head as a function of volume flow rate.
  * @param {array of floats} Vdots [ft^3/sec]
- * @param {float or int} HpMax [ft-lbf/lbm]
- * @param {flaot or int} VdotMax [ft^3/sec]
+ * @param {object} params
  * @returns [ft-lbf/lbm]
  */
-function calcHps(Vdots,HpMax,VdotMax) {
+function calcHps(Vdots,params) {
     return Vdots.map(Vdot => {
         // Ellipse equation:
-        return HpMax*(1 - Vdot**2/VdotMax**2)**(1/2);
+        return params.HpMax*(1 - Vdot**2/params.VdotMax**2)**(1/2);
     });
 };
+
+/**
+ * Scale pump curve for speed and identical pump combinations
+ * @param {array of floats} Vdots [ft^3/sec]
+ * @param {array of floats} Hps [ft-lbf/lbm]
+ * @param {object} params
+ * @returns {arrays of floats} scaled Vdots, Hps
+ */
+function scalePumpCurve(VdotsDef,HpsDef,params) {
+    params.HpMax = HpMaxDef * (params.pumpSpeed**2) * params.N_ser
+    params.VdotMax = VdotMaxDef * params.pumpSpeed * params.N_par
+    return [
+        VdotsDef.map(x => x * params.pumpSpeed * params.N_par), 
+        HpsDef.map(x => x * (params.pumpSpeed**2) * params.N_ser)
+    ]
+};
+
+/**
+ * Add pumps in parallel
+ * @param {} 
+ */
+
 
 /**
  * 
@@ -237,16 +267,16 @@ function updatePlot(Vdots,SLs,Hps) {
 // }
 
 // Explicit approach
-function findOP(params,HpMax,VdotMax,Vdots,Hps,SLs) {
+function findOP(Vdots,Hps,SLs,params) {
     let dpewf = (params.z2 - params.z1)*params.g/params.gc 
                 + (params.P2 - params.P1)*params.nu*144,
         dkeConstantsksys = (1/params.A2**2 - 1/params.A1**2)/(2*params.gc) 
             + params.ksys
         //SL = dkeConstantsksys*Vdot**2 + dpewf;
-        //Hp = HpMax*(1 - Vdot**2/VdotMax**2)**(1/2);
+        //Hp = params.HpMax*(1 - Vdot**2/params.VdotMax**2)**(1/2);
     let a = dkeConstantsksys**2,
-        b = 2*dkeConstantsksys*dpewf + HpMax**2/VdotMax**2,
-        c = dpewf**2 - HpMax**2;
+        b = 2*dkeConstantsksys*dpewf + params.HpMax**2/params.VdotMax**2,
+        c = dpewf**2 - params.HpMax**2;
     let Vdot = ((-b + (b**2 - 4*a*c)**(1/2)) / (2*a))**(1/2);
     if (!isNaN(Vdot)) {
         let Hp = interp1d(Vdots,Hps)(Vdot),
@@ -311,17 +341,16 @@ function updateNumbers(params,opPoint) {
 };
 
 // create arrays
-let n = 400, // number of values in each array
-    VdotMin = 0, // [ft^3/sec]
-    VdotMax = 12; // [ft^3/sec]
-    HpMax = 400; // [ft-lbf/lbm]
-    VdotMax = VdotMax; // [ft^3/sec]
-let Vdots = calcVdots(n,VdotMin,VdotMax);
-let SLs = calcSLs(Vdots,params);
-    Hps = calcHps(Vdots,HpMax,VdotMax);
+let n = 400 // number of values in each array
+
+let VdotsDef = calcVdots(n,params),
+    Vdots = calcVdots(n,params);
+let SLs = calcSLs(Vdots,params),
+    HpsDef = calcHps(Vdots,params),
+    Hps = calcHps(Vdots,params);
 
 // display OP
-let opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+let opPoint = findOP(Vdots,Hps,SLs,params);
 updateNumbers(params,opPoint);
 
 // Combine data in objects
@@ -356,7 +385,7 @@ let sliderP1 = d3.sliderBottom()
         // recalculate SL
         SLs = calcSLs(Vdots,params);
         // recalculate opPoint
-        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+        opPoint = findOP(Vdots,Hps,SLs,params);
         // clear Plot
         clearPlot();
         // update plot
@@ -389,7 +418,7 @@ let sliderA1 = d3.sliderBottom()
         // recalculate SL
         SLs = calcSLs(Vdots,params);
         // recalculate opPoint
-        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+        opPoint = findOP(Vdots,Hps,SLs,params);
         // clear Plot
         clearPlot();
         // update plot
@@ -424,7 +453,7 @@ let sliderKsys = d3.sliderBottom()
         // recalculate SL
         SLs = calcSLs(Vdots,params);
         // recalculate opPoint
-        opPoint = findOP(params,HpMax,VdotMax,Vdots,Hps,SLs);
+        opPoint = findOP(Vdots,Hps,SLs,params);
         // clear Plot
         clearPlot();
         // update plot
@@ -442,6 +471,41 @@ let gSliderKsys = d3.select('div#slider-ksys')
     .attr('transform', 'translate(30,30)');
 
 gSliderKsys.call(sliderKsys)
+
+let sliderPumpSpeed = d3.sliderBottom()
+    .min(pumpSpeedMin)
+    .max(pumpSpeedMax)
+    .width(sliderWidth)
+    //.tickFormat()
+    .default(params.pumpSpeed)
+    .on('onchange', val=> {
+        // update pumpSpeed
+        params.pumpSpeed = val;
+        // update pumpSpeed label
+        d3.select("#pump-speed-value").text(`${d3.format(".2f")(params.pumpSpeed)}`);
+        // Scale Pump Curve
+        [Vdots,Hps] = scalePumpCurve(VdotsDef,HpsDef,params)
+        // recalculate SL
+        SLs = calcSLs(Vdots,params);
+        // recalculate opPoint
+        opPoint = findOP(Vdots,Hps,SLs,params);
+        // clear Plot
+        clearPlot();
+        // update plot
+        updatePlot(Vdots,SLs,Hps);
+        // update numbers
+        updateNumbers(params,opPoint);
+    });
+
+let gSliderPumpSpeed = d3.select('div#slider-pump-speed')
+    .append('svg')
+    .attr('width', sliderWidth + 30*2)
+    .attr('height', sliderHeight)
+    .style("vertical-align", "middle")
+    .append('g')
+    .attr('transform', 'translate(30,30)');
+
+gSliderPumpSpeed.call(sliderPumpSpeed)
 
 // create svg for plot
 let svg = d3.select("body").append("svg")
